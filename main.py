@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
+import time
 
 
 app = FastAPI()
@@ -25,9 +26,9 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, message:str):
+    async def broadcast(self, data:dict):
         for connection in self.active_connections:
-            await connection.send_text(message)
+            await connection.send_text(data)
 
 manager = ConnectionManager()
 
@@ -37,12 +38,25 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            await manager.broadcast(f"Someone said: {data}")
+            data = await websocket.receive_json()
+
+            username = data.get("username", "Anonymous")
+            message_text = data.get("text", "")
+
+            payload = {
+                "username": username,
+                "text": message_text,
+                "timestamp": time.strftime("%H:%M:%S")
+            }
+            await manager.broadcast(payload)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        await manager.broadcast("A user has left the chat.")
+        await manager.broadcast({
+            "username": "System",
+            "text": "An anonymous user left the chat.",
+            "timestamp": time.strftime("%H:%M:%S")
+        })
     # await websocket.accept()
     # try:
     #     while True:
