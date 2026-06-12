@@ -1,19 +1,27 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+# from typing import List
 
-from src.config.db import engine, get_db
-from src.config import models
-from sqlalchemy.orm import Session
-import src.post as post
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-app.include_router(post.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["*"],
+    allow_credentials = True,
+    allow_methods = ["*"],
+    allow_headers = ["*"],
+)
 
 
-
-@app.get("/sqlalchemy")
-def test_posts(db: Session = Depends(get_db)):
-
-    posts = db.query(models.Post).all()
-    return {"data":posts}
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            print(data)
+            await websocket.send_text(f"Message recieved: {data}")
+    except WebSocketDisconnect:
+        print("Client disconnected gracefully.")
+        
